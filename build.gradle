@@ -1,0 +1,125 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group 'io.github.noodlemind'
+version '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // DJL Core
+    implementation platform("ai.djl:bom:0.25.0")
+    implementation "ai.djl:api"
+    implementation "ai.djl:model-zoo"
+    implementation "ai.djl:basicdataset"
+    implementation "ai.djl:basicmodelzoo"
+
+    // PyTorch Engine
+    runtimeOnly "ai.djl.pytorch:pytorch-engine"
+
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+    implementation 'ch.qos.logback:logback-classic:1.4.11'
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+application {
+    mainClass = 'io.github.noodlemind.djlmnisttrainer.MnistApplication'
+}
+
+tasks.register('trainModel', JavaExec) {
+    group = 'MNIST'
+    description = 'Trains the MNIST model'
+
+    mainClass = 'io.github.noodlemind.djlmnisttrainer.MnistApplication'
+    classpath = sourceSets.main.runtimeClasspath
+
+    jvmArgs = ['-Xmx4g']
+}
+
+tasks.register('runPredict', JavaExec) {
+    group = 'MNIST'
+    description = 'Run prediction on a test image'
+
+    mainClass = 'io.github.noodlemind.djlmnisttrainer.MnistPredictor'
+    classpath = sourceSets.main.runtimeClasspath
+
+    jvmArgs = ['-Xmx2g']
+
+    doFirst {
+        def resourceFile = new File(sourceSets.main.resources.srcDirs.first(), "test-images/number_7.png")
+        if (!resourceFile.exists()) {
+            throw new GradleException("""
+                Test image not found at: ${resourceFile.absolutePath}
+                Please add the test image to: src/main/resources/test-images/number_7.png
+            """.stripIndent())
+        }
+        args resourceFile.absolutePath
+    }
+}
+
+tasks.register('verifyResources') {
+    group = 'MNIST'
+    description = 'Verify that required resources are present'
+
+    doLast {
+        // Check test image
+        def resourceFile = new File(sourceSets.main.resources.srcDirs.first(), "test-images/number_7.png")
+        println "Checking for test image at: ${resourceFile.absolutePath}"
+        if (!resourceFile.exists()) {
+            throw new GradleException("""
+                Test image not found!
+                Please add the test image to: src/main/resources/test-images/number_7.png
+            """.stripIndent())
+        }
+        println "✓ Test image found"
+
+        // Check model files
+        def modelDir = project.file("build/model")
+        def paramsFile = new File(modelDir, "mnist-0002.params")
+
+        println "Checking model directory: ${modelDir.absolutePath}"
+        println "Looking for: ${paramsFile.name}"
+
+        if (!paramsFile.exists()) {
+            println """
+                ✗ Model file not found
+                Please run './gradlew trainModel' first
+                Current files in ${modelDir}:
+                ${modelDir.listFiles()?.join('\n')}
+            """.stripIndent()
+        } else {
+            println "✓ Found model file: ${paramsFile.name}"
+        }
+    }
+}
+
+// Make sure resources are processed before running tasks
+tasks.named('runPredict') {
+    dependsOn 'processResources'
+}
+
+tasks.named('trainModel') {
+    dependsOn 'processResources'
+}
+
+jar {
+    manifest {
+        attributes(
+                'Implementation-Title': 'DJL MNIST Trainer',
+                'Implementation-Version': version,
+                'Main-Class': application.mainClass
+        )
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
