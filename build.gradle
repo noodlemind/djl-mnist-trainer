@@ -16,7 +16,6 @@ dependencies {
     implementation "ai.djl:api"
     implementation "ai.djl:model-zoo"
     implementation "ai.djl:basicdataset"
-    implementation "ai.djl:basicmodelzoo"
 
     // PyTorch Engine
     runtimeOnly "ai.djl.pytorch:pytorch-engine"
@@ -44,9 +43,10 @@ tasks.register('trainModel', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
 
     jvmArgs = ['-Xmx4g']
+    ignoreExitValue = true
 }
 
-tasks.register('runPredict', JavaExec) {
+tasks.register('predict', JavaExec) {
     group = 'MNIST'
     description = 'Run prediction on a test image'
 
@@ -54,6 +54,7 @@ tasks.register('runPredict', JavaExec) {
     classpath = sourceSets.main.runtimeClasspath
 
     jvmArgs = ['-Xmx2g']
+    ignoreExitValue = true
 
     doFirst {
         def resourceFile = new File(sourceSets.main.resources.srcDirs.first(), "test-images/number_7.png")
@@ -104,7 +105,7 @@ tasks.register('verifyResources') {
 }
 
 // Make sure resources are processed before running tasks
-tasks.named('runPredict') {
+tasks.named('predict') {
     dependsOn 'processResources'
 }
 
